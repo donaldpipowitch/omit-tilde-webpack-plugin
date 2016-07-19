@@ -42,7 +42,7 @@ OmitTildeWebpackPlugin.prototype.apply = function apply(compiler) {
     var doResolve = this.doResolve.bind(this);
 
     // void recursing, request must lead with single ./ to be relevant
-    var requestFile    = candidate.request.split('!').pop(),
+    var requestFile    = candidate.relativePath.split('!').pop(),
         normalisedFile = path.normalize(requestFile),
         isRelevant     = /^\.[\\\/]/.test(requestFile) && /^[^\.~\\\/]/.test(normalisedFile),
         recursionKey   = [candidate.path, normalisedFile].join('|'),
@@ -56,7 +56,7 @@ OmitTildeWebpackPlugin.prototype.apply = function apply(compiler) {
     else {
       var isIncluded = [
         ModuleFilenameHelpers.matchObject(options.path || {}, candidate.path),
-        ModuleFilenameHelpers.matchObject(options.request || {}, candidate.request)
+        ModuleFilenameHelpers.matchObject(options.relativePath || {}, candidate.relativePath)
       ];
 
       // verbose messaging
@@ -64,7 +64,7 @@ OmitTildeWebpackPlugin.prototype.apply = function apply(compiler) {
         var text = [
           PACKAGE_NAME + ':',
           (isIncluded[0] ? '\u2713' : '\u2715') + ' path    "' + candidate.path + '"',
-          (isIncluded[1] ? '\u2713' : '\u2715') + ' request "' + candidate.request + '"'
+          (isIncluded[1] ? '\u2713' : '\u2715') + ' relativePath "' + candidate.relativePath + '"'
         ].join('\n  ');
         console.log(text);
       }
@@ -72,7 +72,7 @@ OmitTildeWebpackPlugin.prototype.apply = function apply(compiler) {
       // repeat the request, but this time we control the callbacks
       if (isIncluded.every(Boolean)) {
         recursionStart(recursionKey);
-        doResolve(['directory'], candidate, onDirectoryResolve);
+        doResolve(['directory'], candidate, null, onDirectoryResolve);
       }
       // not relevant
       else {
@@ -86,13 +86,11 @@ OmitTildeWebpackPlugin.prototype.apply = function apply(compiler) {
 
       // relaunch the request as a module, removing any relative path prefix
       if (!result) {
-        amended = {
-          path   : candidate.path,
-          request: normalisedFile,
-          query  : candidate.query,
+        amended = Object.assign({}, candidate, {
+          relativePath: normalisedFile,
           module : true
-        };
-        doResolve(['module'], amended, options.deprecate ? resolved : done);
+        });
+        doResolve(['module'], amended, null, options.deprecate ? resolved : done);
       }
       // use the original request
       else {
@@ -104,7 +102,7 @@ OmitTildeWebpackPlugin.prototype.apply = function apply(compiler) {
           warn([
             'files should use ~ to refer to modules:',
             '  in directory: "' + candidate.path + '"',
-            '  change "' + amended.request + '" -> "~' + amended.request + '"'
+            '  change "' + amended.relativePath + '" -> "~' + amended.relativePath + '"'
           ].join('\n'));
         }
         done(error, result);
